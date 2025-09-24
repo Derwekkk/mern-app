@@ -57,21 +57,26 @@ router.post("/", auth, upload.single("file"), async (req, res) => {
   }
 });
 
-// Helper function to distribute items
 async function distributeItems(items, res) {
-  const agents = await Agent.find();
-  if (agents.length < 1)
-    return res.status(400).json({ message: "No agents found" });
+  const agents = await Agent.find().limit(5); // pick only 5 agents
 
-  // Clear old distributions
-  await DistributedList.deleteMany({});
+  if (agents.length < 5) {
+    return res.status(400).json({
+      message: "At least 5 agents are required to distribute items",
+    });
+  }
+
+  // Clear previous distributions for these agents
+  await DistributedList.deleteMany({
+    agent: { $in: agents.map((a) => a._id) },
+  });
 
   const distribution = {};
   agents.forEach((agent) => (distribution[agent._id] = []));
 
   let i = 0;
   items.forEach((item) => {
-    const agentId = agents[i % agents.length]._id;
+    const agentId = agents[i % 5]._id; // cycle through 5 agents
     distribution[agentId].push(item);
     i++;
   });
@@ -88,7 +93,7 @@ async function distributeItems(items, res) {
   }
 
   res.json({
-    message: "File distributed successfully",
+    message: "File distributed successfully among 5 agents",
     distribution: savedLists,
   });
 }
